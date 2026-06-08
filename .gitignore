@@ -1,0 +1,15 @@
+﻿.chrome-profile/
+.claude/
+.vscode/
+
+*.tmp
+*.log
+
+# Build outputs
+build/
+dist/
+.pio/
+
+# OS files
+Thumbs.db
+.DS_Store
