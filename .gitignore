@@ -1,12 +1,23 @@
-﻿.chrome-profile/
+.chrome-profile/
 .claude/
 .vscode/
 
+# Local/editor files
 *.tmp
 *.log
+*.zip
+
+# ESP-IDF local configuration and generated files
+sdkconfig
+sdkconfig.old
+software/sdkconfig
+software/sdkconfig.old
+managed_components/
+software/managed_components/
 
 # Build outputs
 build/
+software/build/
 dist/
 .pio/
 
