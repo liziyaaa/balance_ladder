@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#102033" />
+    <meta name="theme-color" content="#f5f5f7" />
     <title>Balance Ladder Debug</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -17,41 +17,74 @@
     </script>
   </head>
   <body>
-    <main class="shell">
+    <main class="app-shell">
       <header class="topbar">
         <div>
           <p class="eyebrow">Balance Ladder</p>
-          <h1>蓝牙 / WiFi 调试助手</h1>
+          <h1>调试助手</h1>
         </div>
         <span id="connectionBadge" class="badge badge-off">未连接</span>
       </header>
 
-      <section class="layout">
-        <section class="panel hero-panel">
+      <section class="metric-grid" aria-label="实时遥测">
+        <article class="metric-card">
+          <span>状态</span>
+          <strong id="stateValue">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>角度</span>
+          <strong id="angleValue">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>目标</span>
+          <strong id="targetValue">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>误差</span>
+          <strong id="errorValue">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>角速度</span>
+          <strong id="gyroValue">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>电机</span>
+          <strong id="cmdValue">--</strong>
+        </article>
+      </section>
+
+      <section class="main-grid">
+        <section class="panel visual-panel">
           <div class="panel-head">
             <div>
-              <h2>姿态预览</h2>
+              <h2>姿态</h2>
               <p id="telemetryHint">等待遥测数据</p>
             </div>
-            <button id="zeroViewBtn" class="icon-btn" type="button" title="将当前视图作为参考">校准视图</button>
+            <button id="zeroViewBtn" class="ghost-btn" type="button">校准视图</button>
           </div>
-          <div id="scene" class="scene"></div>
-          <div class="telemetry-grid">
-            <div><span>状态</span><strong id="stateValue">--</strong></div>
-            <div><span>角度</span><strong id="angleValue">--</strong></div>
-            <div><span>目标</span><strong id="targetValue">--</strong></div>
-            <div><span>误差</span><strong id="errorValue">--</strong></div>
-            <div><span>角速度</span><strong id="gyroValue">--</strong></div>
-            <div><span>电机</span><strong id="cmdValue">--</strong></div>
+
+          <div class="scene-wrap">
+            <div id="scene" class="scene" aria-label="正方体姿态预览"></div>
+            <div class="axis-legend" aria-label="坐标轴颜色">
+              <span><i class="axis-dot axis-x"></i>X</span>
+              <span><i class="axis-dot axis-y"></i>Y</span>
+              <span><i class="axis-dot axis-z"></i>Z</span>
+            </div>
+          </div>
+
+          <div class="chart-head">
+            <span>误差 / 电机输出</span>
+            <span class="chart-legend"><i class="line-error"></i>error <i class="line-cmd"></i>cmd</span>
           </div>
           <canvas id="plot" class="plot" width="900" height="220"></canvas>
         </section>
 
-        <aside class="stack">
+        <aside class="side-stack">
           <section class="panel">
             <div class="panel-head">
               <h2>连接</h2>
             </div>
+
             <div class="tabs" role="tablist">
               <button id="bleTab" class="tab active" type="button">BLE</button>
               <button id="wifiTab" class="tab" type="button">WiFi</button>
@@ -60,12 +93,12 @@
             <div id="blePane" class="tab-pane active">
               <button id="bleConnectBtn" class="primary-btn" type="button">连接 BalanceLadder</button>
               <button id="bleDisconnectBtn" class="secondary-btn" type="button" disabled>断开</button>
-              <p class="note">Android Chrome/Edge 支持 Web Bluetooth。iPhone Safari 通常无法使用网页蓝牙。</p>
+              <p class="note">建议使用 Android Chrome 或 Edge。</p>
             </div>
 
             <div id="wifiPane" class="tab-pane">
               <label class="field">
-                <span>WebSocket 地址</span>
+                <span>WebSocket</span>
                 <input id="wsUrl" value="ws://192.168.4.1/ws" autocomplete="off" />
               </label>
               <div class="button-row">
@@ -73,10 +106,10 @@
                 <button id="wifiDisconnectBtn" class="secondary-btn" type="button" disabled>断开</button>
               </div>
               <label class="field">
-                <span>HTTP 命令地址</span>
+                <span>HTTP 命令</span>
                 <input id="httpUrl" value="http://192.168.4.1/cmd" autocomplete="off" />
               </label>
-              <p class="note">GitHub Pages 是 HTTPS，浏览器可能拦截普通 HTTP/WS。WiFi 模式更适合后续把本页面放到 ESP32 本地服务中使用。</p>
+              <p class="note">GitHub Pages 下普通 HTTP/WS 可能被浏览器拦截。</p>
             </div>
           </section>
 
@@ -110,7 +143,7 @@
               <label><span>baseline</span><input id="baselineInput" type="number" step="0.01" value="0" /></label>
               <label><span>motor</span><input id="motorInput" type="number" step="0.05" value="0" /></label>
             </div>
-            <div class="button-row wrap">
+            <div class="send-grid">
               <button data-param="target" data-input="targetInput" type="button">发 target</button>
               <button data-param="kp" data-input="kpInput" type="button">发 kp</button>
               <button data-param="ki" data-input="kiInput" type="button">发 ki</button>
@@ -124,10 +157,10 @@
 
           <section class="panel">
             <div class="panel-head">
-              <h2>命令行</h2>
+              <h2>命令</h2>
             </div>
             <form id="commandForm" class="command-form">
-              <input id="commandInput" placeholder="例如 kp=0.03 或 target=270" autocomplete="off" />
+              <input id="commandInput" placeholder="kp=0.03 或 target=270" autocomplete="off" />
               <button class="primary-btn" type="submit">发送</button>
             </form>
             <pre id="log" class="log"></pre>
