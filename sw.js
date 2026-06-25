@@ -1,4 +1,4 @@
-const CACHE_NAME = "balance-debug-v1";
+const CACHE_NAME = "balance-debug-v2";
 const ASSETS = [
   "./",
   "./index.html",
