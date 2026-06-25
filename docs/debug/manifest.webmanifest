@@ -1,0 +1,19 @@
+{
+  "name": "Balance Ladder Debug",
+  "short_name": "BalanceDebug",
+  "description": "平衡梯 BLE 和 WiFi 调试助手",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#102033",
+  "background_color": "#0b111a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

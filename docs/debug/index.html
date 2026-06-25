@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#102033" />
+    <title>Balance Ladder Debug</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.165.0/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Balance Ladder</p>
+          <h1>蓝牙 / WiFi 调试助手</h1>
+        </div>
+        <span id="connectionBadge" class="badge badge-off">未连接</span>
+      </header>
+
+      <section class="layout">
+        <section class="panel hero-panel">
+          <div class="panel-head">
+            <div>
+              <h2>姿态预览</h2>
+              <p id="telemetryHint">等待遥测数据</p>
+            </div>
+            <button id="zeroViewBtn" class="icon-btn" type="button" title="将当前视图作为参考">校准视图</button>
+          </div>
+          <div id="scene" class="scene"></div>
+          <div class="telemetry-grid">
+            <div><span>状态</span><strong id="stateValue">--</strong></div>
+            <div><span>角度</span><strong id="angleValue">--</strong></div>
+            <div><span>目标</span><strong id="targetValue">--</strong></div>
+            <div><span>误差</span><strong id="errorValue">--</strong></div>
+            <div><span>角速度</span><strong id="gyroValue">--</strong></div>
+            <div><span>电机</span><strong id="cmdValue">--</strong></div>
+          </div>
+          <canvas id="plot" class="plot" width="900" height="220"></canvas>
+        </section>
+
+        <aside class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>连接</h2>
+            </div>
+            <div class="tabs" role="tablist">
+              <button id="bleTab" class="tab active" type="button">BLE</button>
+              <button id="wifiTab" class="tab" type="button">WiFi</button>
+            </div>
+
+            <div id="blePane" class="tab-pane active">
+              <button id="bleConnectBtn" class="primary-btn" type="button">连接 BalanceLadder</button>
+              <button id="bleDisconnectBtn" class="secondary-btn" type="button" disabled>断开</button>
+              <p class="note">Android Chrome/Edge 支持 Web Bluetooth。iPhone Safari 通常无法使用网页蓝牙。</p>
+            </div>
+
+            <div id="wifiPane" class="tab-pane">
+              <label class="field">
+                <span>WebSocket 地址</span>
+                <input id="wsUrl" value="ws://192.168.4.1/ws" autocomplete="off" />
+              </label>
+              <div class="button-row">
+                <button id="wifiConnectBtn" class="primary-btn" type="button">连接</button>
+                <button id="wifiDisconnectBtn" class="secondary-btn" type="button" disabled>断开</button>
+              </div>
+              <label class="field">
+                <span>HTTP 命令地址</span>
+                <input id="httpUrl" value="http://192.168.4.1/cmd" autocomplete="off" />
+              </label>
+              <p class="note">GitHub Pages 是 HTTPS，浏览器可能拦截普通 HTTP/WS。WiFi 模式更适合后续把本页面放到 ESP32 本地服务中使用。</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>快捷控制</h2>
+            </div>
+            <div class="quick-grid">
+              <button data-command="status" type="button">status</button>
+              <button data-command="level" type="button">level</button>
+              <button data-command="arm" type="button">arm</button>
+              <button data-command="stop" type="button">stop</button>
+              <button data-command="fault_clear" type="button">clear</button>
+              <button data-command="cal" type="button">cal</button>
+              <button data-command="auto_on" type="button">auto on</button>
+              <button data-command="auto_off" type="button">auto off</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>参数</h2>
+            </div>
+            <div class="param-grid">
+              <label><span>target</span><input id="targetInput" type="number" step="0.1" value="270" /></label>
+              <label><span>kp</span><input id="kpInput" type="number" step="0.001" value="0.02" /></label>
+              <label><span>ki</span><input id="kiInput" type="number" step="0.001" value="0" /></label>
+              <label><span>kd</span><input id="kdInput" type="number" step="0.001" value="0.004" /></label>
+              <label><span>limit</span><input id="limitInput" type="number" step="0.05" value="1" /></label>
+              <label><span>min_cmd</span><input id="minCmdInput" type="number" step="0.01" value="0.12" /></label>
+              <label><span>baseline</span><input id="baselineInput" type="number" step="0.01" value="0" /></label>
+              <label><span>motor</span><input id="motorInput" type="number" step="0.05" value="0" /></label>
+            </div>
+            <div class="button-row wrap">
+              <button data-param="target" data-input="targetInput" type="button">发 target</button>
+              <button data-param="kp" data-input="kpInput" type="button">发 kp</button>
+              <button data-param="ki" data-input="kiInput" type="button">发 ki</button>
+              <button data-param="kd" data-input="kdInput" type="button">发 kd</button>
+              <button data-param="limit" data-input="limitInput" type="button">发 limit</button>
+              <button data-param="min_cmd" data-input="minCmdInput" type="button">发 min</button>
+              <button data-param="baseline" data-input="baselineInput" type="button">发 base</button>
+              <button data-param="motor" data-input="motorInput" type="button">发 motor</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>命令行</h2>
+            </div>
+            <form id="commandForm" class="command-form">
+              <input id="commandInput" placeholder="例如 kp=0.03 或 target=270" autocomplete="off" />
+              <button class="primary-btn" type="submit">发送</button>
+            </form>
+            <pre id="log" class="log"></pre>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
