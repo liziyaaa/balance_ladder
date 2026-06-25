@@ -219,9 +219,9 @@ function drawPlot() {
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "#0a1320";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = "#253650";
+  ctx.strokeStyle = "#e5e5ea";
   ctx.lineWidth = 1;
   for (let i = 1; i < 4; i++) {
     const y = (height / 4) * i;
@@ -246,79 +246,106 @@ function drawPlot() {
     ctx.stroke();
   }
 
-  drawLine((t) => t.error, "#ffcf70", 35);
-  drawLine((t) => t.cmd * 35, "#55d6be", 35);
-  ctx.fillStyle = "#8ea0b8";
-  ctx.font = "24px Microsoft YaHei, sans-serif";
-  ctx.fillText("黄: error  青: motor cmd", 16, 30);
+  drawLine((t) => t.error, "#ff9500", 35);
+  drawLine((t) => t.cmd * 35, "#007aff", 35);
+  ctx.strokeStyle = "#d1d1d6";
+  ctx.beginPath();
+  ctx.moveTo(0, height / 2);
+  ctx.lineTo(width, height / 2);
+  ctx.stroke();
 }
 
 let scene;
 let camera;
 let renderer;
-let ladder;
-let targetLine;
+let cube;
 
 function init3d() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x08111f);
-  camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(0, 2.4, 6);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  scene.background = new THREE.Color(0xffffff);
+  camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(3.2, 2.4, 4.2);
+  camera.lookAt(0, 0, 0);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(window.devicePixelRatio || 1);
   els.scene.appendChild(renderer.domElement);
 
-  const light = new THREE.DirectionalLight(0xffffff, 1.8);
+  const light = new THREE.DirectionalLight(0xffffff, 2.2);
   light.position.set(3, 4, 5);
   scene.add(light);
-  scene.add(new THREE.AmbientLight(0x7890aa, 0.8));
+  scene.add(new THREE.AmbientLight(0xffffff, 1.25));
 
-  const grid = new THREE.GridHelper(6, 12, 0x29405e, 0x1a2b43);
-  grid.position.y = -1.6;
+  const grid = new THREE.GridHelper(4.8, 8, 0xd1d1d6, 0xe5e5ea);
+  grid.position.y = -1.18;
   scene.add(grid);
 
-  ladder = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({ color: 0x2f8cff, roughness: 0.5 });
-  const accent = new THREE.MeshStandardMaterial({ color: 0x55d6be, roughness: 0.4 });
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x007aff,
+    roughness: 0.42,
+    metalness: 0.06,
+  });
+  cube = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.35, 1.35), material);
+  scene.add(cube);
 
-  const railGeo = new THREE.BoxGeometry(0.18, 2.8, 0.1);
-  const barGeo = new THREE.BoxGeometry(1.35, 0.16, 0.12);
-  const left = new THREE.Mesh(railGeo, material);
-  const right = new THREE.Mesh(railGeo, material);
-  left.position.x = -0.7;
-  right.position.x = 0.7;
-  const crossTop = new THREE.Mesh(barGeo, accent);
-  crossTop.position.y = 0.75;
-  const crossMid = new THREE.Mesh(barGeo, accent);
-  crossMid.position.y = 0;
-  const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.28, 32), new THREE.MeshStandardMaterial({ color: 0xffcf70 }));
-  motor.rotation.x = Math.PI / 2;
-  motor.position.y = 1.25;
-  ladder.add(left, right, crossTop, crossMid, motor);
-  scene.add(ladder);
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(cube.geometry),
+    new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+  );
+  cube.add(edges);
 
-  const lineMat = new THREE.LineBasicMaterial({ color: 0xffcf70 });
-  const points = [new THREE.Vector3(0, -1.5, 0), new THREE.Vector3(0, 1.7, 0)];
-  targetLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lineMat);
-  scene.add(targetLine);
+  createAxis(new THREE.Vector3(1, 0, 0), 0xff3b30, "X", new THREE.Vector3(1.9, 0, 0));
+  createAxis(new THREE.Vector3(0, 1, 0), 0x34c759, "Y", new THREE.Vector3(0, 1.9, 0));
+  createAxis(new THREE.Vector3(0, 0, 1), 0x007aff, "Z", new THREE.Vector3(0, 0, 1.9));
 
   window.addEventListener("resize", resize3d);
   resize3d();
   animate3d();
 }
 
+function createAxis(direction, color, label, labelPosition) {
+  const axis = new THREE.ArrowHelper(direction, new THREE.Vector3(0, 0, 0), 1.7, color, 0.2, 0.09);
+  scene.add(axis);
+  const sprite = makeLabel(label, color);
+  sprite.position.copy(labelPosition);
+  scene.add(sprite);
+}
+
+function makeLabel(text, color) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 96;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
+  ctx.beginPath();
+  ctx.arc(48, 48, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 42px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 48, 50);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+  sprite.scale.set(0.34, 0.34, 0.34);
+  return sprite;
+}
+
 function resize3d() {
   const rect = els.scene.getBoundingClientRect();
-  renderer.setSize(rect.width, rect.height, false);
+  renderer.setSize(rect.width, rect.height, true);
   camera.aspect = rect.width / Math.max(1, rect.height);
   camera.updateProjectionMatrix();
 }
 
 function updateModel(t) {
   const error = Number.isFinite(t.error) ? t.error : wrapError(t.target, t.angle);
-  const tilt = THREE.MathUtils.degToRad(clamp(-error + state.viewZero, -55, 55));
-  ladder.rotation.z = tilt;
-  ladder.rotation.y = THREE.MathUtils.degToRad(clamp(t.cmd * 22, -22, 22));
+  const shownError = clamp(error - state.viewZero, -70, 70);
+  cube.rotation.set(
+    THREE.MathUtils.degToRad(clamp(t.gyro * 0.25, -18, 18)),
+    THREE.MathUtils.degToRad(shownError),
+    THREE.MathUtils.degToRad(clamp(t.cmd * 18, -18, 18))
+  );
 }
 
 function animate3d() {
