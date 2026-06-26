@@ -11,7 +11,7 @@ https://liziyaaa.github.io/balance_ladder/
 ## 主要功能
 
 - 通过 Web Bluetooth 连接 ESP32-C3 固件中的 `BalanceLadder` 设备。
-- 实时显示状态、角度、目标角、误差、角速度、电机输出、按键和故障状态。
+- 显示状态、角度、目标角、误差、角速度、电机输出、按键和故障状态。当前固件 BLE Notify 限速约 2 Hz。
 - 使用正方体显示当前姿态，并在 3D 场景中标出 X/Y/Z 坐标轴。
 - 提供误差和电机输出曲线，方便观察调参过程中的响应趋势。
 - 支持快捷命令、PID 参数、目标角、最小输出、基准输出和手动电机测试命令。
@@ -42,7 +42,7 @@ T,<ms>,<state>,<angle>,<target>,<error>,<gyro>,<cmd>,<key>,<fault>
 示例：
 
 ```text
-T,83996,ARMED,89.73,90.00,0.27,-0.30,-0.016,0,NONE
+T,83996,ARMED,269.73,270.00,0.27,-0.30,-0.016,0,NONE
 ```
 
 ## 支持命令
@@ -73,7 +73,7 @@ baseline=0
 motor=0.3
 ```
 
-命令行也可以直接输入固件支持的其他命令，例如 `motor_stop`、`motor_full`、`force_wake_on`。
+命令行也可以直接输入固件支持的其他命令，例如 `motor_stop`、`motor_full`、`motor_full_rev`、`force_wake_on`。当前固件目标角会限制在 `250..290 deg`，直立附近默认目标为 `270 deg`。
 
 ## 手机使用
 

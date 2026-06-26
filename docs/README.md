@@ -24,8 +24,8 @@ https://liziyaaa.github.io/balance_ladder/
 调试网页支持：
 
 - Web Bluetooth 连接 `BalanceLadder`。
-- 实时显示状态、角度、目标角、误差、角速度和电机输出。
-- 发送 `target`、`kp`、`ki`、`kd`、`limit`、`motor` 等调参命令。
+- 显示状态、角度、目标角、误差、角速度和电机输出；当前 BLE Notify 限速约 2 Hz。
+- 发送 `target`、`kp`、`ki`、`kd`、`limit`、`min_cmd`、`baseline`、`motor` 等调参命令。
 - 使用正方体和 X/Y/Z 坐标轴显示当前姿态。
 
 GitHub Pages 由 [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) 自动部署 `docs/debug/`。
