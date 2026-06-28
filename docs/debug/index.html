@@ -91,9 +91,15 @@
             </div>
 
             <div id="blePane" class="tab-pane active">
-              <button id="bleConnectBtn" class="primary-btn" type="button">连接 BalanceLadder</button>
+              <div class="button-row">
+                <button id="bleScanBtn" class="primary-btn" type="button">搜索蓝牙设备</button>
+                <button id="bleConnectBtn" class="secondary-btn" type="button" disabled>连接选中设备</button>
+              </div>
+              <div id="bleDeviceList" class="device-list" role="listbox" aria-label="已选择的蓝牙设备">
+                <p class="device-empty">未选择设备。点击“搜索蓝牙设备”，在浏览器弹出的列表中选择要连接的设备。</p>
+              </div>
               <button id="bleDisconnectBtn" class="secondary-btn" type="button" disabled>断开</button>
-              <p class="note">建议使用 Android Chrome 或 Edge。</p>
+              <p class="note">搜索会打开浏览器蓝牙选择器；页面会保存已授权过的设备，建议使用 Android Chrome 或 Edge。</p>
             </div>
 
             <div id="wifiPane" class="tab-pane">

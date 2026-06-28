@@ -7,6 +7,8 @@ const BLE_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 const state = {
   transport: null,
   bleDevice: null,
+  bleDevices: new Map(),
+  selectedBleDeviceId: null,
   bleServer: null,
   rxChar: null,
   txChar: null,
@@ -23,8 +25,10 @@ const decoder = new TextDecoder();
 
 const els = {
   badge: $("connectionBadge"),
+  bleScan: $("bleScanBtn"),
   bleConnect: $("bleConnectBtn"),
   bleDisconnect: $("bleDisconnectBtn"),
+  bleDeviceList: $("bleDeviceList"),
   wifiConnect: $("wifiConnectBtn"),
   wifiDisconnect: $("wifiDisconnectBtn"),
   wsUrl: $("wsUrl"),
@@ -55,10 +59,12 @@ function setConnected(connected, transport = null) {
   state.transport = connected ? transport : null;
   els.badge.textContent = connected ? `${transport} 已连接` : "未连接";
   els.badge.className = `badge ${connected ? "badge-on" : "badge-off"}`;
-  els.bleConnect.disabled = connected;
+  els.bleScan.disabled = connected;
+  els.bleConnect.disabled = connected || !state.selectedBleDeviceId;
   els.bleDisconnect.disabled = !connected || transport !== "BLE";
   els.wifiConnect.disabled = connected;
   els.wifiDisconnect.disabled = !connected || transport !== "WiFi";
+  renderBleDeviceList();
 }
 
 function clamp(value, min, max) {
@@ -122,21 +128,123 @@ function onReceiveText(text) {
   }
 }
 
-async function connectBle() {
+function getBleDeviceLabel(device) {
+  return device?.name || "未命名蓝牙设备";
+}
+
+function getBleDeviceShortId(device) {
+  if (!device?.id) return "unknown";
+  return device.id.length > 18 ? `${device.id.slice(0, 8)}...${device.id.slice(-6)}` : device.id;
+}
+
+function registerBleDevice(device) {
+  if (!device?.id) return;
+  const existed = state.bleDevices.has(device.id);
+  state.bleDevices.set(device.id, device);
+  if (!existed) {
+    device.addEventListener("gattserverdisconnected", () => {
+      state.bleServer = null;
+      state.rxChar = null;
+      state.txChar = null;
+      setConnected(false);
+      log(`BLE 已断开: ${getBleDeviceLabel(device)}`, "err");
+    });
+  }
+}
+
+function selectBleDevice(deviceId) {
+  if (!state.bleDevices.has(deviceId)) return;
+  state.selectedBleDeviceId = deviceId;
+  els.bleConnect.disabled = state.connected || !state.selectedBleDeviceId;
+  renderBleDeviceList();
+}
+
+function renderBleDeviceList() {
+  const devices = Array.from(state.bleDevices.values());
+  if (devices.length === 0) {
+    els.bleDeviceList.innerHTML =
+      '<p class="device-empty">未选择设备。点击“搜索蓝牙设备”，在浏览器弹出的列表中选择要连接的设备。</p>';
+    return;
+  }
+
+  els.bleDeviceList.innerHTML = "";
+  for (const device of devices) {
+    const selected = device.id === state.selectedBleDeviceId;
+    const connected = state.transport === "BLE" && state.connected && state.bleDevice?.id === device.id;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `device-item${selected ? " selected" : ""}${connected ? " connected" : ""}`;
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.dataset.deviceId = device.id;
+    button.innerHTML = `
+      <span>
+        <strong>${escapeHtml(getBleDeviceLabel(device))}</strong>
+        <small>${escapeHtml(getBleDeviceShortId(device))}</small>
+      </span>
+      <i>${connected ? "已连接" : selected ? "已选择" : "选择"}</i>
+    `;
+    button.addEventListener("click", () => selectBleDevice(device.id));
+    els.bleDeviceList.appendChild(button);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function scanBleDevices() {
   if (!navigator.bluetooth) {
     log("当前浏览器不支持 Web Bluetooth。请使用 Android Chrome/Edge。", "err");
     return;
   }
   try {
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: "BalanceLadder" }],
+      acceptAllDevices: true,
       optionalServices: [BLE_SERVICE],
     });
+    registerBleDevice(device);
+    selectBleDevice(device.id);
+    log(`已选择蓝牙设备: ${getBleDeviceLabel(device)}`);
+  } catch (error) {
+    if (error.name === "NotFoundError") {
+      log("已取消蓝牙设备选择。");
+    } else {
+      log(`蓝牙搜索失败: ${error.message}`, "err");
+    }
+  }
+}
+
+async function loadGrantedBleDevices() {
+  if (!navigator.bluetooth?.getDevices) return;
+  try {
+    const devices = await navigator.bluetooth.getDevices();
+    for (const device of devices) {
+      registerBleDevice(device);
+    }
+    if (devices.length > 0 && !state.selectedBleDeviceId) {
+      selectBleDevice(devices[0].id);
+      log(`已载入 ${devices.length} 个授权过的蓝牙设备`);
+    } else {
+      renderBleDeviceList();
+    }
+  } catch (error) {
+    log(`读取已授权蓝牙设备失败: ${error.message}`, "err");
+  }
+}
+
+async function connectBleDevice(device) {
+  if (!device) {
+    log("请先搜索并选择一个蓝牙设备。", "err");
+    return;
+  }
+  try {
     state.bleDevice = device;
-    device.addEventListener("gattserverdisconnected", () => {
-      setConnected(false);
-      log("BLE 已断开", "err");
-    });
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(BLE_SERVICE);
     state.rxChar = await service.getCharacteristic(BLE_RX);
@@ -147,15 +255,32 @@ async function connectBle() {
     });
     state.bleServer = server;
     setConnected(true, "BLE");
-    log("BLE 连接成功");
+    log(`BLE 连接成功: ${getBleDeviceLabel(device)}`);
     await sendCommand("status");
   } catch (error) {
+    device.gatt?.disconnect();
+    state.bleServer = null;
+    state.rxChar = null;
+    state.txChar = null;
+    setConnected(false);
+    if (error.name === "NotFoundError") {
+      log("连接失败：该设备没有暴露 BalanceLadder 调试服务，请重新选择 ESP32-C3 设备。", "err");
+      return;
+    }
     log(`BLE 连接失败: ${error.message}`, "err");
   }
 }
 
+async function connectSelectedBle() {
+  const device = state.bleDevices.get(state.selectedBleDeviceId);
+  await connectBleDevice(device);
+}
+
 function disconnectBle() {
   state.bleDevice?.gatt?.disconnect();
+  state.bleServer = null;
+  state.rxChar = null;
+  state.txChar = null;
   setConnected(false);
 }
 
@@ -356,7 +481,8 @@ function animate3d() {
 function bindUi() {
   $("bleTab").addEventListener("click", () => switchTab("ble"));
   $("wifiTab").addEventListener("click", () => switchTab("wifi"));
-  els.bleConnect.addEventListener("click", connectBle);
+  els.bleScan.addEventListener("click", scanBleDevices);
+  els.bleConnect.addEventListener("click", connectSelectedBle);
   els.bleDisconnect.addEventListener("click", disconnectBle);
   els.wifiConnect.addEventListener("click", connectWifi);
   els.wifiDisconnect.addEventListener("click", disconnectWifi);
@@ -401,4 +527,6 @@ async function registerServiceWorker() {
 bindUi();
 init3d();
 drawPlot();
+renderBleDeviceList();
+loadGrantedBleDevices();
 registerServiceWorker();

@@ -128,7 +128,7 @@ idf.py flash monitor
 https://liziyaaa.github.io/balance_ladder/
 ```
 
-连接名为 `BalanceLadder` 的 BLE 设备后，可以查看姿态遥测、发送 PID 参数、设置目标角、执行停机命令，并通过 3D 正方体观察 IMU 姿态变化。
+点击 `搜索蓝牙设备`，在浏览器弹出的蓝牙列表中选择 ESP32-C3 设备，再连接 `BalanceLadder` 调试服务。连接后可以查看姿态遥测、发送 PID 参数、设置目标角、执行停机命令，并通过 3D 正方体观察 IMU 姿态变化。
 
 ## BLE 调试协议
 
