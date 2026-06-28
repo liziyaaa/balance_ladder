@@ -270,6 +270,12 @@ void ble_command_handler(const char *command, char *response, size_t response_le
         respond_status(response, response_len);
         return;
     }
+    if (std::strcmp(cmd, "defaults") == 0 || std::strcmp(cmd, "params_default") == 0) {
+        app_state_reset_params();
+        balance_controller_reset();
+        respond_status(response, response_len);
+        return;
+    }
 
     if (std::strcmp(cmd, "auto_on") == 0) {
         s_auto_stabilize = true;
@@ -320,9 +326,17 @@ void ble_command_handler(const char *command, char *response, size_t response_le
         return;
     }
     if (std::strcmp(cmd, "motor_full_rev") == 0) {
+        if (app_state_get() != AppState::DISARMED) {
+            std::snprintf(response, response_len, "ERR state\n");
+            return;
+        }
+        const uint32_t now = millis();
+        const uint32_t duration_ms = 2000;
+        s_motor_override_until_ms = now + duration_ms;
+        s_motor_override_cmd = -1.0f;
         motor_sleep(false);
-        motor_set(-1.0f);
-        std::snprintf(response, response_len, "OK motor_full_rev\n");
+        motor_set(s_motor_override_cmd);
+        std::snprintf(response, response_len, "OK motor_full_rev until=%lu\n", static_cast<unsigned long>(s_motor_override_until_ms));
         return;
     }
     if (std::strcmp(cmd, "motor_stop") == 0) {
@@ -340,7 +354,17 @@ void ble_command_handler(const char *command, char *response, size_t response_le
             if (std::fabs(value) < 0.001f) {
                 motor_coast();
                 motor_sleep(true);
+                s_motor_override_until_ms = 0;
+                s_motor_override_cmd = 0.0f;
             } else {
+                if (app_state_get() != AppState::DISARMED) {
+                    std::snprintf(response, response_len, "ERR state\n");
+                    return;
+                }
+                const uint32_t now = millis();
+                const uint32_t duration_ms = 5000;
+                s_motor_override_until_ms = now + duration_ms;
+                s_motor_override_cmd = value;
                 motor_sleep(false);
                 motor_set(value);
             }
@@ -436,7 +460,7 @@ void control_task(void *arg)
         const float error = app_angle_error_deg(params.target_angle_deg, measured_angle);
         if (state == AppState::FAULT) {
             force_motor_off();
-            app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, 0.0f, true);
+            app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, 0.0f, true, imu.accel_plane_deg, imu.accel_angle_deg);
             continue;
         }
 
@@ -446,7 +470,7 @@ void control_task(void *arg)
                     angle_fault_since_ms = now;
                 } else if (now - angle_fault_since_ms >= kAngleFaultDelayMs) {
                     enter_fault(FaultCode::ANGLE_LIMIT);
-                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, 0.0f, true);
+                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, 0.0f, true, imu.accel_plane_deg, imu.accel_angle_deg);
                     angle_fault_since_ms = 0;
                     continue;
                 }
@@ -454,8 +478,7 @@ void control_task(void *arg)
                 angle_fault_since_ms = 0;
             }
 
-            motor_sleep(false);
-            cmd = balance_controller_update(measured_angle, params, kControlDtS);
+            cmd = balance_controller_update(measured_angle, imu.gyro_rate_deg_s, params, kControlDtS);
             // Add baseline command (user-configurable) before sending to motor
             {
                 float final_cmd = cmd + params.baseline_cmd;
@@ -479,7 +502,7 @@ void control_task(void *arg)
                     // keep override active
                     motor_sleep(false);
                     motor_set(s_motor_override_cmd);
-                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, s_motor_override_cmd, true);
+                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, s_motor_override_cmd, true, imu.accel_plane_deg, imu.accel_angle_deg);
                     continue;
                 }
             } else {
@@ -498,7 +521,7 @@ void control_task(void *arg)
             }
         }
 
-        app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, cmd, true);
+        app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, cmd, true, imu.accel_plane_deg, imu.accel_angle_deg);
     }
 }
 
@@ -590,8 +613,6 @@ void diagnostic_task(void *arg)
     while (true) {
         const Telemetry t = app_state_get_telemetry();
         const MotorDebug motor = motor_debug_get();
-        ImuReading imu {};
-        esp_err_t imu_err = imu_update(kControlDtS, &imu);
         if (motor.sleep_set_level == 1 && motor.sleep_read_level == 0 &&
             (motor.in1_duty > 0 || motor.in2_duty > 0) && !sleep_read_warned) {
             ESP_LOGW(TAG, "GPIO5 nSLEEP was written HIGH but readback is LOW; trust meter reading first and check actual DRV input/output voltage");
@@ -605,8 +626,8 @@ void diagnostic_task(void *arg)
                  t.target_deg,
                  t.error_deg,
                  t.gyro_rate_deg_s,
-                 (imu_err == ESP_OK ? imu.accel_plane_deg : 0.0f),
-                 (imu_err == ESP_OK ? imu.accel_angle_deg : 0.0f),
+                 t.accel_plane_deg,
+                 t.accel_angle_deg,
                  t.motor_cmd,
                  motor.sleep_set_level,
              motor.sleep_read_level,

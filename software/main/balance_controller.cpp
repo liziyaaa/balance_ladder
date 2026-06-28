@@ -5,9 +5,6 @@
 namespace {
 
 float s_integral = 0.0f;
-float s_last_error = 0.0f;
-bool s_have_last_error = false;
-
 float clampf(float value, float lo, float hi)
 {
     if (value < lo) {
@@ -24,14 +21,15 @@ float clampf(float value, float lo, float hi)
 void balance_controller_reset()
 {
     s_integral = 0.0f;
-    s_last_error = 0.0f;
-    s_have_last_error = false;
 }
 
-float balance_controller_update(float angle_deg, const ControlParams &params, float dt_s)
+float balance_controller_update(float angle_deg, float gyro_rate_deg_s, const ControlParams &params, float dt_s)
 {
     const float error = app_angle_error_deg(params.target_angle_deg, angle_deg);
-    const float d_error = s_have_last_error ? (error - s_last_error) / dt_s : 0.0f;
+    // Target is normally constant, so error derivative is approximately
+    // -angle_rate. Using gyro directly gives a faster D term than differencing
+    // the filtered angle.
+    const float d_error = std::isfinite(gyro_rate_deg_s) ? -gyro_rate_deg_s : 0.0f;
 
     // Non-linear proportional boost for small errors: amplify P term when
     // abs(error) is small so that small deviations produce stronger corrective
@@ -49,7 +47,5 @@ float balance_controller_update(float angle_deg, const ControlParams &params, fl
         s_integral = clampf(candidate_integral, -200.0f, 200.0f);
     }
 
-    s_last_error = error;
-    s_have_last_error = true;
     return limited;
 }

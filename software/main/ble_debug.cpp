@@ -271,7 +271,7 @@ void ble_debug_notify_telemetry(const Telemetry &telemetry)
         return;
     }
     const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-    const uint32_t kMinIntervalMs = 500; // at most 2Hz notifications
+    const uint32_t kMinIntervalMs = 100; // at most 10Hz notifications for tuning
     if (s_last_telemetry_ms != 0 && now_ms - s_last_telemetry_ms < kMinIntervalMs) {
         return;
     }

@@ -39,6 +39,8 @@ struct Telemetry {
     float target_deg = 270.0f;
     float error_deg = 0.0f;
     float gyro_rate_deg_s = 0.0f;
+    float accel_plane_deg = 0.0f;
+    float accel_angle_deg = 90.0f;
     float motor_cmd = 0.0f;
     bool key_pressed = false;
     bool ble_connected = false;
@@ -66,8 +68,14 @@ void app_state_set_kd(float kd);
 bool app_state_set_output_limit(float limit);
 void app_state_set_min_cmd(float min_cmd);
 void app_state_set_baseline_cmd(float baseline);
+void app_state_reset_params();
 
 void app_state_set_key_pressed(bool pressed);
 void app_state_set_ble_connected(bool connected);
-void app_state_set_motion(float angle_deg, float gyro_rate_deg_s, float motor_cmd, bool imu_ok);
+void app_state_set_motion(float angle_deg,
+                          float gyro_rate_deg_s,
+                          float motor_cmd,
+                          bool imu_ok,
+                          float accel_plane_deg = 0.0f,
+                          float accel_angle_deg = 90.0f);
 Telemetry app_state_get_telemetry();

@@ -11,7 +11,7 @@ https://liziyaaa.github.io/balance_ladder/
 ## 主要功能
 
 - 通过 Web Bluetooth 搜索并选择附近 BLE 设备，再连接 ESP32-C3 固件中的 `BalanceLadder` 调试服务。
-- 显示状态、角度、目标角、误差、角速度、电机输出、按键和故障状态。当前固件 BLE Notify 限速约 2 Hz。
+- 显示状态、角度、目标角、误差、角速度、电机输出、按键和故障状态。当前固件 BLE Notify 限速约 10 Hz。
 - 使用正方体显示当前姿态，并在 3D 场景中标出 X/Y/Z 坐标轴。
 - 提供误差和电机输出曲线，方便观察调参过程中的响应趋势。
 - 支持快捷命令、PID 参数、目标角、最小输出、基准输出和手动电机测试命令。
@@ -51,6 +51,7 @@ T,83996,ARMED,269.73,270.00,0.27,-0.30,-0.016,0,NONE
 
 ```text
 status
+defaults
 level
 arm
 stop

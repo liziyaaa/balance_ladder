@@ -371,6 +371,34 @@ void app_state_set_baseline_cmd(float baseline)
     }
 }
 
+void app_state_reset_params()
+{
+    lock();
+    s_params = ControlParams {};
+    s_telemetry.target_deg = s_params.target_angle_deg;
+    s_telemetry.error_deg = app_angle_error_deg(s_params.target_angle_deg, s_telemetry.angle_deg);
+    const ControlParams params = s_params;
+    unlock();
+
+    nvs_handle_t handle;
+    esp_err_t rc = nvs_open("storage", NVS_READWRITE, &handle);
+    if (rc == ESP_OK) {
+        rc = nvs_set_blob(handle, "params", &params, sizeof(params));
+        if (rc == ESP_OK) {
+            rc = nvs_commit(handle);
+        }
+        if (rc != ESP_OK) {
+            ESP_LOGW("app_state", "Failed to save default params: %d", rc);
+        } else {
+            ESP_LOGI("app_state", "Reset params to defaults kp=%.6f ki=%.6f kd=%.6f limit=%.3f min_cmd=%.3f baseline=%.3f target=%.2f",
+                     params.kp, params.ki, params.kd, params.output_limit, params.min_cmd, params.baseline_cmd, params.target_angle_deg);
+        }
+        nvs_close(handle);
+    } else {
+        ESP_LOGW("app_state", "NVS open failed when resetting params: %d", rc);
+    }
+}
+
 void app_state_set_key_pressed(bool pressed)
 {
     lock();
@@ -385,13 +413,20 @@ void app_state_set_ble_connected(bool connected)
     unlock();
 }
 
-void app_state_set_motion(float angle_deg, float gyro_rate_deg_s, float motor_cmd, bool imu_ok)
+void app_state_set_motion(float angle_deg,
+                          float gyro_rate_deg_s,
+                          float motor_cmd,
+                          bool imu_ok,
+                          float accel_plane_deg,
+                          float accel_angle_deg)
 {
     lock();
     s_telemetry.angle_deg = angle_deg;
     s_telemetry.target_deg = s_params.target_angle_deg;
     s_telemetry.error_deg = app_angle_error_deg(s_params.target_angle_deg, angle_deg);
     s_telemetry.gyro_rate_deg_s = gyro_rate_deg_s;
+    s_telemetry.accel_plane_deg = accel_plane_deg;
+    s_telemetry.accel_angle_deg = accel_angle_deg;
     s_telemetry.motor_cmd = motor_cmd;
     s_telemetry.imu_ok = imu_ok;
     unlock();

@@ -15,6 +15,8 @@ namespace {
 static const char *TAG = "mpu6050";
 static constexpr i2c_port_t kI2cPort = I2C_NUM_0;
 static constexpr uint32_t kI2cFreqHz = 400000;
+static constexpr TickType_t kI2cReadTimeout = pdMS_TO_TICKS(10);
+static constexpr TickType_t kI2cWriteTimeout = pdMS_TO_TICKS(20);
 static constexpr float kRadToDeg = 57.2957795f;
 static constexpr float kComplementaryAlpha = 0.98f;
 static constexpr float kGyroScale500Dps = 65.5f;
@@ -90,12 +92,12 @@ char axis_name(int axis)
 esp_err_t write_reg(uint8_t reg, uint8_t value)
 {
     uint8_t data[2] = {reg, value};
-    return i2c_master_write_to_device(kI2cPort, MPU6050_I2C_ADDR, data, sizeof(data), pdMS_TO_TICKS(100));
+    return i2c_master_write_to_device(kI2cPort, MPU6050_I2C_ADDR, data, sizeof(data), kI2cWriteTimeout);
 }
 
 esp_err_t read_regs(uint8_t start_reg, uint8_t *data, size_t len)
 {
-    return i2c_master_write_read_device(kI2cPort, MPU6050_I2C_ADDR, &start_reg, 1, data, len, pdMS_TO_TICKS(100));
+    return i2c_master_write_read_device(kI2cPort, MPU6050_I2C_ADDR, &start_reg, 1, data, len, kI2cReadTimeout);
 }
 
 esp_err_t probe_addr(uint8_t addr)
@@ -207,7 +209,7 @@ esp_err_t imu_init()
         ESP_LOGE(TAG, "write SMPLRT_DIV failed: %s", esp_err_to_name(err));
         return err;
     }
-    err = write_reg(0x1A, 0x03); // CONFIG, DLPF
+    err = write_reg(0x1A, 0x02); // CONFIG, DLPF_CFG=2 for lower attitude delay
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "write CONFIG failed: %s", esp_err_to_name(err));
         return err;

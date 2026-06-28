@@ -24,6 +24,7 @@ uint32_t s_last_in1_duty = 0;
 uint32_t s_last_in2_duty = 0;
 int s_sleep_set_level = 0;
 bool s_wake_failed = false;
+bool s_awake = false;
 // Allow ignoring sleep readback failures by default for this hardware setup
 // so PWM output can be tested even if gpio readback of nSLEEP is unreliable.
 bool s_ignore_wake = true;
@@ -70,6 +71,10 @@ void set_sleep_level(int level)
 // remains low, attempt a few toggles. If still failing, mark wake_failed.
 static void try_wake_driver()
 {
+    if (s_awake && s_sleep_set_level == 1) {
+        return;
+    }
+
     s_wake_failed = false;
     set_sleep_level(1);
     // small delay to let levels settle
@@ -77,6 +82,7 @@ static void try_wake_driver()
     int read = gpio_get_level(PIN_DRV_SLEEP);
     if (read == 1) {
         s_wake_failed = false;
+        s_awake = true;
         return;
     }
 
@@ -89,11 +95,13 @@ static void try_wake_driver()
         read = gpio_get_level(PIN_DRV_SLEEP);
         if (read == 1) {
             s_wake_failed = false;
+            s_awake = true;
             return;
         }
     }
 
     s_wake_failed = true;
+    s_awake = s_ignore_wake;
 }
 
 uint32_t cmd_to_duty(float cmd)
@@ -156,9 +164,9 @@ void motor_set(float cmd)
         return;
     }
 
-    // Limit command slew to avoid sudden large current draws.
-    // Increased from 0.1 to 0.5 for faster response (tune carefully).
-    const float kMaxDelta = 0.3f; // max change per call
+    // Command range is -1..1, so a limit of 2.0 is effectively no slew limit.
+    // The balance loop needs immediate reversal when crossing the target angle.
+    const float kMaxDelta = 2.0f; // no practical command slew limit
     if (std::fabs(cmd - s_last_cmd) > kMaxDelta) {
         if (cmd > s_last_cmd) cmd = s_last_cmd + kMaxDelta;
         else cmd = s_last_cmd - kMaxDelta;
@@ -171,8 +179,11 @@ void motor_set(float cmd)
             cmd = (cmd > 0.0f) ? min_cmd : -min_cmd;
         }
     }
-    // Ensure driver is awake before driving PWM
-    try_wake_driver();
+    // Ensure driver is awake before driving PWM. This only blocks on the first
+    // wake after sleep; normal control-loop updates return immediately.
+    if (!s_awake || s_sleep_set_level == 0) {
+        try_wake_driver();
+    }
     if (s_wake_failed && !s_ignore_wake) {
         // If wake failed, avoid trying to drive the motor to prevent
         // unpredictable behavior; keep outputs coasting.
@@ -182,6 +193,7 @@ void motor_set(float cmd)
     }
 
     set_sleep_level(1);
+    s_awake = true;
     const uint32_t duty = cmd_to_duty(cmd);
     // Swap channels for reversed motor direction: positive cmd drives IN2
     if (cmd > 0.0f) {
@@ -222,9 +234,11 @@ void motor_sleep(bool sleep)
     if (sleep) {
         motor_coast();
         set_sleep_level(0);
+        s_awake = false;
     } else {
         try_wake_driver();
         set_sleep_level(1);
+        s_awake = !s_wake_failed || s_ignore_wake;
     }
 }
 
@@ -238,11 +252,11 @@ MotorDebug motor_debug_get()
     if (s_last_in1_duty == 0 && s_last_in2_duty == 0 && std::fabs(s_last_cmd) > 0.0001f) {
         const uint32_t expected = cmd_to_duty(s_last_cmd);
         if (s_last_cmd > 0.0f) {
-            debug.in1_duty = expected;
-            debug.in2_duty = 0;
-        } else {
             debug.in1_duty = 0;
             debug.in2_duty = expected;
+        } else {
+            debug.in1_duty = expected;
+            debug.in2_duty = 0;
         }
     } else {
         debug.in1_duty = s_last_in1_duty;

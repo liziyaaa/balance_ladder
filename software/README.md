@@ -159,6 +159,7 @@ GPIO8 是 ESP32-C3 SuperMini 板载蓝色 LED。当前 `STATUS_LED_ACTIVE_LOW = 
 | I2C | `I2C_NUM_0`，400 kHz |
 | 采样周期 | 控制环 5 ms，即 200 Hz |
 | 互补滤波系数 | `alpha = 0.98` |
+| MPU6050 DLPF | `DLPF_CFG=2`，降低姿态滞后 |
 | 陀螺仪量程 | ±500 deg/s |
 | 加速度计量程 | ±2 g |
 | 控制角速度 | `gyro_y` |
@@ -193,19 +194,21 @@ imu_set_current_angle(target_angle_deg);
 | `min_cmd` | `0.12` | 小输出死区补偿 |
 | `baseline_cmd` | `0.0` | 基准电机命令补偿 |
 
-参数会保存到 NVS，复位后会继续使用上次通过 BLE 设置的值。如果需要恢复默认值，可以擦除 NVS 或在代码中增加恢复默认命令。
+参数会保存到 NVS，复位后会继续使用上次通过 BLE 设置的值。如果需要恢复默认值，可以通过 BLE 发送 `defaults`。
 
 当前 PWM 计算公式在 `balance_controller.cpp`：
 
 ```cpp
 error = shortest_angle_error(target_angle_deg, angle_deg);
-d_error = (error - last_error) / dt;
+d_error = -gyro_y;
 boost = 1.0f + 2.0f * exp(-abs(error) / 10.0f);
 kp_eff = kp * boost;
 candidate_integral = integral + error * dt;
 unsat = kp_eff * error + ki * candidate_integral + kd * d_error;
 u = clamp(unsat, -output_limit, output_limit);
 ```
+
+`d_error` 直接使用陀螺仪角速度，而不是用滤波后的角度差分。这样目标角附近越过 `270 deg` 时，D 项能提前根据运动趋势反向给力，响应比“等角度误差变化后再计算”更快。
 
 如果输出已经饱和并且误差方向会让饱和更严重，积分项不会继续累加。随后在 `app_main.cpp` 中叠加 `baseline_cmd`，再送入 `motor_set()`：
 
@@ -232,7 +235,7 @@ motor_set(final_cmd);
 | PWM 频率 | 20 kHz |
 | PWM 分辨率 | 10 bit，最大 duty `1023` |
 | 命令范围 | `-1.0..1.0` |
-| 单次变化限制 | 每次 `motor_set()` 最大变化 `0.3` |
+| 单次变化限制 | `2.0`，等效不限制，允许正反向立即切换 |
 | 小输出补偿 | `abs(cmd) < min_cmd` 时提升到 `min_cmd` |
 | nSLEEP 读回异常 | 默认忽略读回失败，以实测电压为准 |
 
@@ -269,13 +272,14 @@ T,<ms>,<state>,<angle>,<target>,<error>,<gyro>,<cmd>,<key>,<fault>
 T,83996,ARMED,269.73,270.00,0.27,-0.30,-0.016,0,NONE
 ```
 
-`gyro` 当前是 `gyro_y`，单位 deg/s。BLE 任务每 50 ms 检查一次遥测，但 `ble_debug.cpp` 对 Notify 做了 500 ms 限速，因此当前实际最大发送频率约为 2 Hz。控制环本身仍是 200 Hz。
+`gyro` 当前是 `gyro_y`，单位 deg/s。BLE 任务每 50 ms 检查一次遥测，`ble_debug.cpp` 对 Notify 做了 100 ms 限速，因此当前实际最大发送频率约为 10 Hz。控制环本身仍是 200 Hz。
 
 支持命令：
 
 | 命令 | 作用 |
 |---|---|
 | `status` | 立即回传状态和参数 |
+| `defaults` | 恢复默认 PID、目标角、输出限幅、`min_cmd` 和 `baseline` |
 | `arm` | 进入 `READY`，等待 GPIO1 按键确认 |
 | `stop` | 立即停机，回到 `DISARMED` |
 | `fault_clear` | 清除故障，回到 `DISARMED` |
@@ -297,7 +301,7 @@ T,83996,ARMED,269.73,270.00,0.27,-0.30,-0.016,0,NONE
 | `motor=0.3` | `DISARMED` 下手动电机测试，持续约 5 s |
 | `motor=0` | 停止手动电机测试 |
 | `motor_full` | `DISARMED` 下正向满输出测试，约 2 s 后自动停止 |
-| `motor_full_rev` | 反向满输出测试，需要手动 `motor_stop` 停止 |
+| `motor_full_rev` | `DISARMED` 下反向满输出测试，约 2 s 后自动停止 |
 | `motor_stop` | 停止手动电机测试并关闭电机 |
 
 当前固件没有 BLE 在线切换 IMU 轴向的 `axis=...` 命令。若需要重新试轴，应直接修改 `imu_mpu6050.cpp`。
@@ -347,7 +351,7 @@ diag state=ARMED angle=269.73 target=270.00 error=0.27 gyro_y=-0.30 accel_plane=
 |---|---|---:|---|
 | `control_task` | 200 Hz | 10 | 读取 IMU、判断安全、更新 PID、输出电机 |
 | `key_task` | 10 ms 轮询 | 8 | GPIO1 消抖、短按/长按事件 |
-| `ble_notify_task` | 50 ms 检查 | 4 | 发送 BLE 遥测，实际 Notify 约 2 Hz |
+| `ble_notify_task` | 50 ms 检查 | 4 | 发送 BLE 遥测，实际 Notify 约 10 Hz |
 | `ui_task` | 200 ms | 3 | OLED 表情刷新 |
 | `diagnostic_task` | 500 ms | 2 | USB 日志输出 |
 | `status_led_task` | 20 ms | 1 | GPIO8 LED 模式刷新 |
@@ -373,4 +377,4 @@ diag state=ARMED angle=269.73 target=270.00 error=0.27 gyro_y=-0.30 accel_plane=
 - 如果实物方向反了，优先判断是 IMU 角度方向反，还是电机推力方向反。
 - 如果电机小占空比抖动不转，先调 `min_cmd` 或手动 `motor=...` 找最小可转命令。
 - 如果 OLED 或 GPIO9 导致启动异常，可以先断开 OLED 或检查上拉。
-- 如果 BLE 遥测频率不够，可以降低 `ble_debug.cpp` 中的 500 ms 限速，但不要影响 200 Hz 控制任务。
+- 如果 BLE 遥测频率不够，可以降低 `ble_debug.cpp` 中的 100 ms 限速，但不要影响 200 Hz 控制任务。

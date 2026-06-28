@@ -24,7 +24,7 @@ https://liziyaaa.github.io/balance_ladder/
 调试网页支持：
 
 - Web Bluetooth 搜索并选择附近 BLE 设备，再连接 `BalanceLadder` 调试服务。
-- 显示状态、角度、目标角、误差、角速度和电机输出；当前 BLE Notify 限速约 2 Hz。
+- 显示状态、角度、目标角、误差、角速度和电机输出；当前 BLE Notify 限速约 10 Hz。
 - 发送 `target`、`kp`、`ki`、`kd`、`limit`、`min_cmd`、`baseline`、`motor` 等调参命令。
 - 使用正方体和 X/Y/Z 坐标轴显示当前姿态。
 

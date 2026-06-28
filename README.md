@@ -62,7 +62,7 @@
 | 控制轴 | MPU6050 `Y` 轴，前后倾倒方向 |
 | 加速度角度平面 | `atan2(accel_x, accel_z)` |
 | 控制周期 | 200 Hz |
-| BLE 遥测 | 当前 Notify 限速约 2 Hz |
+| BLE 遥测 | 当前 Notify 限速约 10 Hz |
 | 电池检测 | 硬件保留 `BAT_ADC`，当前固件未启用低电压检测 |
 
 课程报告中仍可把物理直立称为 90 deg，但固件日志、BLE 命令和 Web 调试工具以 `270 deg` 作为当前直立附近的默认目标。
@@ -156,6 +156,7 @@ T,<ms>,<state>,<angle>,<target>,<error>,<gyro>,<cmd>,<key>,<fault>
 
 ```text
 status
+defaults
 arm
 stop
 fault_clear
