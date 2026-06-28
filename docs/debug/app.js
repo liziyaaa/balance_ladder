@@ -46,6 +46,59 @@ const els = {
   plot: $("plot"),
   scene: $("scene"),
   zeroView: $("zeroViewBtn"),
+  targetInput: $("targetInput"),
+  kpInput: $("kpInput"),
+  kiInput: $("kiInput"),
+  kdInput: $("kdInput"),
+  limitInput: $("limitInput"),
+  gainPosInput: $("gainPosInput"),
+  gainNegInput: $("gainNegInput"),
+  minPosInput: $("minPosInput"),
+  minNegInput: $("minNegInput"),
+  kickPosInput: $("kickPosInput"),
+  kickNegInput: $("kickNegInput"),
+  baselineInput: $("baselineInput"),
+  motorInput: $("motorInput"),
+};
+
+const PARAM_INPUTS = {
+  target: ["targetInput"],
+  kp: ["kpInput"],
+  ki: ["kiInput"],
+  kd: ["kdInput"],
+  limit: ["limitInput"],
+  gain: ["gainPosInput", "gainNegInput"],
+  gain_pos: ["gainPosInput"],
+  gain_neg: ["gainNegInput"],
+  min_cmd: ["minPosInput", "minNegInput"],
+  min_pos: ["minPosInput"],
+  min_neg: ["minNegInput"],
+  kick: ["kickPosInput", "kickNegInput"],
+  kick_cmd: ["kickPosInput", "kickNegInput"],
+  kick_pos: ["kickPosInput"],
+  kick_neg: ["kickNegInput"],
+  baseline: ["baselineInput"],
+  motor: ["motorInput"],
+};
+
+const PARAM_DIGITS = {
+  target: 2,
+  kp: 4,
+  ki: 4,
+  kd: 4,
+  limit: 2,
+  gain: 3,
+  gain_pos: 3,
+  gain_neg: 3,
+  min_cmd: 3,
+  min_pos: 3,
+  min_neg: 3,
+  kick: 3,
+  kick_cmd: 3,
+  kick_pos: 3,
+  kick_neg: 3,
+  baseline: 3,
+  motor: 3,
 };
 
 function log(line, type = "info") {
@@ -100,6 +153,46 @@ function parseTelemetry(line) {
   };
 }
 
+function parseKeyValues(line) {
+  const values = {};
+  const re = /([A-Za-z_]+)=([^,\s]+)/g;
+  let match;
+  while ((match = re.exec(line)) !== null) {
+    values[match[1]] = match[2];
+  }
+  return values;
+}
+
+function formatParamValue(key, value) {
+  const digits = PARAM_DIGITS[key] ?? 3;
+  return Number(value).toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function updateParamInputsFromResponse(line) {
+  if (!line.startsWith("OK ")) return;
+
+  const values = parseKeyValues(line);
+  let updated = 0;
+  for (const [key, raw] of Object.entries(values)) {
+    const value = Number(raw);
+    if (!Number.isFinite(value)) continue;
+
+    const inputIds = PARAM_INPUTS[key];
+    if (!inputIds) continue;
+
+    for (const inputId of inputIds) {
+      const input = els[inputId];
+      if (!input) continue;
+      input.value = formatParamValue(key, value);
+      updated += 1;
+    }
+  }
+
+  if (updated > 0) {
+    log(`参数栏已同步 ${updated} 项`);
+  }
+}
+
 function updateTelemetry(t) {
   if (!Number.isFinite(t.angle)) return;
   state.telemetry = t;
@@ -122,6 +215,7 @@ function onReceiveText(text) {
     const parsed = parseTelemetry(line);
     if (parsed?.response) {
       log(parsed.response);
+      updateParamInputsFromResponse(parsed.response);
     } else if (parsed) {
       updateTelemetry(parsed);
     }
