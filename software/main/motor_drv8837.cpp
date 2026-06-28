@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
+#include "esp_timer.h"
 
 namespace {
 
@@ -25,9 +26,14 @@ uint32_t s_last_in2_duty = 0;
 int s_sleep_set_level = 0;
 bool s_wake_failed = false;
 bool s_awake = false;
+int s_drive_sign = 0;
+uint32_t s_kick_until_ms = 0;
 // Allow ignoring sleep readback failures by default for this hardware setup
 // so PWM output can be tested even if gpio readback of nSLEEP is unreliable.
 bool s_ignore_wake = true;
+
+static constexpr uint32_t kKickDurationMs = 40;
+static constexpr float kKickTriggerCmd = 0.03f;
 
 float clampf(float value, float lo, float hi)
 {
@@ -110,6 +116,11 @@ uint32_t cmd_to_duty(float cmd)
     return static_cast<uint32_t>(duty + 0.5f);
 }
 
+uint32_t millis()
+{
+    return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+}
+
 } // namespace
 
 esp_err_t motor_init()
@@ -156,13 +167,14 @@ esp_err_t motor_init()
     return ESP_OK;
 }
 
-void motor_set(float cmd)
+float motor_set(float cmd)
 {
     cmd = clampf(cmd, -1.0f, 1.0f);
     if (std::fabs(cmd) < 0.001f) {
         motor_coast();
-        return;
+        return 0.0f;
     }
+    const float control_cmd = cmd;
 
     // Command range is -1..1, so a limit of 2.0 is effectively no slew limit.
     // The balance loop needs immediate reversal when crossing the target angle.
@@ -174,10 +186,24 @@ void motor_set(float cmd)
     // Apply minimum command deadzone compensation from persisted params
     {
         const ControlParams p = app_state_get_params();
-        const float min_cmd = clampf(p.min_cmd, 0.0f, 1.0f);
+        const int sign = (cmd > 0.0f) ? 1 : -1;
+        const float gain = (sign > 0) ? p.gain_pos : p.gain_neg;
+        cmd = clampf(cmd * clampf(gain, 0.0f, 3.0f), -1.0f, 1.0f);
+
+        const float min_cmd = clampf((sign > 0) ? p.min_pos : p.min_neg, 0.0f, 1.0f);
         if (min_cmd > 0.0001f && std::fabs(cmd) >= 0.001f && std::fabs(cmd) < min_cmd) {
             cmd = (cmd > 0.0f) ? min_cmd : -min_cmd;
         }
+        const uint32_t now = millis();
+        if (sign != s_drive_sign) {
+            s_kick_until_ms = (std::fabs(control_cmd) >= kKickTriggerCmd) ? now + kKickDurationMs : 0;
+            s_drive_sign = sign;
+        }
+        const float kick_cmd = clampf((sign > 0) ? p.kick_pos : p.kick_neg, 0.0f, 1.0f);
+        if (kick_cmd > 0.0001f && now < s_kick_until_ms && std::fabs(cmd) < kick_cmd) {
+            cmd = (cmd > 0.0f) ? kick_cmd : -kick_cmd;
+        }
+        cmd = clampf(cmd, -p.output_limit, p.output_limit);
     }
     // Ensure driver is awake before driving PWM. This only blocks on the first
     // wake after sleep; normal control-loop updates return immediately.
@@ -189,7 +215,7 @@ void motor_set(float cmd)
         // unpredictable behavior; keep outputs coasting.
         motor_coast();
         s_last_cmd = 0.0f;
-        return;
+        return 0.0f;
     }
 
     set_sleep_level(1);
@@ -208,6 +234,7 @@ void motor_set(float cmd)
         s_last_in2_duty = 0;
     }
     s_last_cmd = cmd;
+    return cmd;
 }
 
 void motor_coast()
@@ -217,6 +244,8 @@ void motor_coast()
     s_last_cmd = 0.0f;
     s_last_in1_duty = 0;
     s_last_in2_duty = 0;
+    s_drive_sign = 0;
+    s_kick_until_ms = 0;
 }
 
 void motor_brake()

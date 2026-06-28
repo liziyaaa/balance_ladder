@@ -146,7 +146,12 @@
               <label><span>ki</span><input id="kiInput" type="number" step="0.001" value="0" /></label>
               <label><span>kd</span><input id="kdInput" type="number" step="0.001" value="0.004" /></label>
               <label><span>limit</span><input id="limitInput" type="number" step="0.05" value="1" /></label>
-              <label><span>min_cmd</span><input id="minCmdInput" type="number" step="0.01" value="0.12" /></label>
+              <label><span>gain_pos</span><input id="gainPosInput" type="number" step="0.05" value="1.00" /></label>
+              <label><span>gain_neg</span><input id="gainNegInput" type="number" step="0.05" value="1.35" /></label>
+              <label><span>min_pos</span><input id="minPosInput" type="number" step="0.01" value="0.18" /></label>
+              <label><span>min_neg</span><input id="minNegInput" type="number" step="0.01" value="0.24" /></label>
+              <label><span>kick_pos</span><input id="kickPosInput" type="number" step="0.01" value="0.24" /></label>
+              <label><span>kick_neg</span><input id="kickNegInput" type="number" step="0.01" value="0.34" /></label>
               <label><span>baseline</span><input id="baselineInput" type="number" step="0.01" value="0" /></label>
               <label><span>motor</span><input id="motorInput" type="number" step="0.05" value="0" /></label>
             </div>
@@ -156,7 +161,12 @@
               <button data-param="ki" data-input="kiInput" type="button">发 ki</button>
               <button data-param="kd" data-input="kdInput" type="button">发 kd</button>
               <button data-param="limit" data-input="limitInput" type="button">发 limit</button>
-              <button data-param="min_cmd" data-input="minCmdInput" type="button">发 min</button>
+              <button data-param="gain_pos" data-input="gainPosInput" type="button">发 g+</button>
+              <button data-param="gain_neg" data-input="gainNegInput" type="button">发 g-</button>
+              <button data-param="min_pos" data-input="minPosInput" type="button">发 min+</button>
+              <button data-param="min_neg" data-input="minNegInput" type="button">发 min-</button>
+              <button data-param="kick_pos" data-input="kickPosInput" type="button">发 k+</button>
+              <button data-param="kick_neg" data-input="kickNegInput" type="button">发 k-</button>
               <button data-param="baseline" data-input="baselineInput" type="button">发 base</button>
               <button data-param="motor" data-input="motorInput" type="button">发 motor</button>
             </div>

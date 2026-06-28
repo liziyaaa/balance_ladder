@@ -23,7 +23,8 @@ namespace {
 
 static const char *TAG = "balance_app";
 
-static constexpr float kControlDtS = 0.005f;
+static constexpr uint32_t kControlPeriodMs = 4;
+static constexpr float kControlDtS = static_cast<float>(kControlPeriodMs) / 1000.0f;
 static constexpr float kArmWindowDeg = 8.0f;
 static constexpr uint32_t kAngleFaultDelayMs = 150;
 static constexpr float kAngleFaultDeg = 35.0f;
@@ -133,9 +134,11 @@ void respond_status(char *response, size_t response_len)
     const Telemetry t = app_state_get_telemetry();
     const ControlParams p = app_state_get_params();
     std::snprintf(response, response_len,
-                  "OK state=%s angle=%.2f target=%.2f kp=%.4f ki=%.4f kd=%.4f limit=%.2f min_cmd=%.3f baseline=%.3f auto=%d fault=%s\n",
+                  "OK state=%s angle=%.2f target=%.2f kp=%.4f ki=%.4f kd=%.4f limit=%.2f gain_pos=%.3f gain_neg=%.3f min_pos=%.3f min_neg=%.3f kick_pos=%.3f kick_neg=%.3f baseline=%.3f auto=%d fault=%s\n",
                   app_state_name(t.state), t.angle_deg, p.target_angle_deg,
-                  p.kp, p.ki, p.kd, p.output_limit, p.min_cmd, p.baseline_cmd, s_auto_stabilize ? 1 : 0, fault_code_name(t.fault));
+                  p.kp, p.ki, p.kd, p.output_limit,
+                  p.gain_pos, p.gain_neg, p.min_pos, p.min_neg, p.kick_pos, p.kick_neg,
+                  p.baseline_cmd, s_auto_stabilize ? 1 : 0, fault_code_name(t.fault));
 }
 
 void ble_command_handler(const char *command, char *response, size_t response_len)
@@ -201,6 +204,84 @@ void ble_command_handler(const char *command, char *response, size_t response_le
         } else {
             app_state_set_min_cmd(value);
             std::snprintf(response, response_len, "OK min_cmd=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "min_pos=", &value)) {
+        if (value < 0.0f || value > 1.0f) {
+            std::snprintf(response, response_len, "ERR range min_pos 0.0..1.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_min_cmds(value, p.min_neg);
+            std::snprintf(response, response_len, "OK min_pos=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "min_neg=", &value)) {
+        if (value < 0.0f || value > 1.0f) {
+            std::snprintf(response, response_len, "ERR range min_neg 0.0..1.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_min_cmds(p.min_pos, value);
+            std::snprintf(response, response_len, "OK min_neg=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "kick=", &value) || command_value(cmd, "kick_cmd=", &value)) {
+        if (value < 0.0f || value > 1.0f) {
+            std::snprintf(response, response_len, "ERR range kick 0.0..1.0\n");
+        } else {
+            app_state_set_kick_cmd(value);
+            std::snprintf(response, response_len, "OK kick=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "kick_pos=", &value)) {
+        if (value < 0.0f || value > 1.0f) {
+            std::snprintf(response, response_len, "ERR range kick_pos 0.0..1.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_kicks(value, p.kick_neg);
+            std::snprintf(response, response_len, "OK kick_pos=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "kick_neg=", &value)) {
+        if (value < 0.0f || value > 1.0f) {
+            std::snprintf(response, response_len, "ERR range kick_neg 0.0..1.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_kicks(p.kick_pos, value);
+            std::snprintf(response, response_len, "OK kick_neg=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "gain=", &value)) {
+        if (value < 0.0f || value > 3.0f) {
+            std::snprintf(response, response_len, "ERR range gain 0.0..3.0\n");
+        } else {
+            app_state_set_motor_gains(value, value);
+            std::snprintf(response, response_len, "OK gain=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "gain_pos=", &value)) {
+        if (value < 0.0f || value > 3.0f) {
+            std::snprintf(response, response_len, "ERR range gain_pos 0.0..3.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_gains(value, p.gain_neg);
+            std::snprintf(response, response_len, "OK gain_pos=%.3f\n", value);
+        }
+        return;
+    }
+    if (command_value(cmd, "gain_neg=", &value)) {
+        if (value < 0.0f || value > 3.0f) {
+            std::snprintf(response, response_len, "ERR range gain_neg 0.0..3.0\n");
+        } else {
+            ControlParams p = app_state_get_params();
+            app_state_set_motor_gains(p.gain_pos, value);
+            std::snprintf(response, response_len, "OK gain_neg=%.3f\n", value);
         }
         return;
     }
@@ -423,7 +504,7 @@ void control_task(void *arg)
     uint32_t angle_fault_since_ms = 0;
 
     while (true) {
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(5));
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(kControlPeriodMs));
         const uint32_t now = millis();
 
         if (s_calibrate_requested) {
@@ -485,8 +566,7 @@ void control_task(void *arg)
                 // enforce output limit
                 if (final_cmd > params.output_limit) final_cmd = params.output_limit;
                 if (final_cmd < -params.output_limit) final_cmd = -params.output_limit;
-                motor_set(final_cmd);
-                cmd = final_cmd;
+                cmd = motor_set(final_cmd);
             }
         } else {
             angle_fault_since_ms = 0;
@@ -501,8 +581,8 @@ void control_task(void *arg)
                 } else {
                     // keep override active
                     motor_sleep(false);
-                    motor_set(s_motor_override_cmd);
-                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, s_motor_override_cmd, true, imu.accel_plane_deg, imu.accel_angle_deg);
+                    const float actual_cmd = motor_set(s_motor_override_cmd);
+                    app_state_set_motion(measured_angle, imu.gyro_rate_deg_s, actual_cmd, true, imu.accel_plane_deg, imu.accel_angle_deg);
                     continue;
                 }
             } else {

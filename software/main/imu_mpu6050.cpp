@@ -204,12 +204,12 @@ esp_err_t imu_init()
         return err;
     }
     vTaskDelay(pdMS_TO_TICKS(50));
-    err = write_reg(0x19, 0x04); // SMPLRT_DIV, 200 Hz class data rate with DLPF
+    err = write_reg(0x19, 0x03); // SMPLRT_DIV, 250 Hz class data rate with DLPF
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "write SMPLRT_DIV failed: %s", esp_err_to_name(err));
         return err;
     }
-    err = write_reg(0x1A, 0x02); // CONFIG, DLPF_CFG=2 for lower attitude delay
+    err = write_reg(0x1A, 0x01); // CONFIG, DLPF_CFG=1 for faster attitude response
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "write CONFIG failed: %s", esp_err_to_name(err));
         return err;

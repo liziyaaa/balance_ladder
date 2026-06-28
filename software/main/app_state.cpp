@@ -127,8 +127,11 @@ void app_state_init()
             if (rc == ESP_OK && required == sizeof(s_params)) {
                 rc = nvs_get_blob(handle, "params", &s_params, &required);
                 if (rc == ESP_OK) {
-                            ESP_LOGI("app_state", "Loaded persisted params kp=%.6f ki=%.6f kd=%.6f limit=%.3f min_cmd=%.3f baseline=%.3f target=%.2f",
-                                     s_params.kp, s_params.ki, s_params.kd, s_params.output_limit, s_params.min_cmd, s_params.baseline_cmd, s_params.target_angle_deg);
+                    ESP_LOGI("app_state",
+                             "Loaded persisted params kp=%.6f ki=%.6f kd=%.6f limit=%.3f gain_pos=%.3f gain_neg=%.3f min_pos=%.3f min_neg=%.3f kick_pos=%.3f kick_neg=%.3f baseline=%.3f target=%.2f",
+                             s_params.kp, s_params.ki, s_params.kd, s_params.output_limit,
+                             s_params.gain_pos, s_params.gain_neg, s_params.min_pos, s_params.min_neg,
+                             s_params.kick_pos, s_params.kick_neg, s_params.baseline_cmd, s_params.target_angle_deg);
                     s_telemetry.target_deg = s_params.target_angle_deg;
                 } else {
                     ESP_LOGW("app_state", "Failed to read params blob: %d", rc);
@@ -248,8 +251,11 @@ void app_state_set_pid(float kp, float ki, float kd)
             if (rc != ESP_OK) {
                 ESP_LOGW("app_state", "Failed to save params to NVS: %d", rc);
             } else {
-                ESP_LOGI("app_state", "Saved params kp=%.6f ki=%.6f kd=%.6f limit=%.3f min_cmd=%.3f baseline=%.3f target=%.2f",
-                         s_params.kp, s_params.ki, s_params.kd, s_params.output_limit, s_params.min_cmd, s_params.baseline_cmd, s_params.target_angle_deg);
+                ESP_LOGI("app_state",
+                         "Saved params kp=%.6f ki=%.6f kd=%.6f limit=%.3f gain_pos=%.3f gain_neg=%.3f min_pos=%.3f min_neg=%.3f kick_pos=%.3f kick_neg=%.3f baseline=%.3f target=%.2f",
+                         s_params.kp, s_params.ki, s_params.kd, s_params.output_limit,
+                         s_params.gain_pos, s_params.gain_neg, s_params.min_pos, s_params.min_neg,
+                         s_params.kick_pos, s_params.kick_neg, s_params.baseline_cmd, s_params.target_angle_deg);
             }
             nvs_close(handle);
         } else {
@@ -338,7 +344,8 @@ bool app_state_set_output_limit(float limit)
 void app_state_set_min_cmd(float min_cmd)
 {
     lock();
-    s_params.min_cmd = min_cmd;
+    s_params.min_pos = min_cmd;
+    s_params.min_neg = min_cmd;
     unlock();
     // persist min_cmd
     {
@@ -348,6 +355,78 @@ void app_state_set_min_cmd(float min_cmd)
             rc = nvs_set_blob(handle, "params", &s_params, sizeof(s_params));
             if (rc == ESP_OK) rc = nvs_commit(handle);
             if (rc != ESP_OK) ESP_LOGW("app_state", "Failed to save min_cmd: %d", rc);
+            nvs_close(handle);
+        }
+    }
+}
+
+void app_state_set_kick_cmd(float kick_cmd)
+{
+    lock();
+    s_params.kick_pos = kick_cmd;
+    s_params.kick_neg = kick_cmd;
+    unlock();
+    {
+        nvs_handle_t handle;
+        esp_err_t rc = nvs_open("storage", NVS_READWRITE, &handle);
+        if (rc == ESP_OK) {
+            rc = nvs_set_blob(handle, "params", &s_params, sizeof(s_params));
+            if (rc == ESP_OK) rc = nvs_commit(handle);
+            if (rc != ESP_OK) ESP_LOGW("app_state", "Failed to save kick_cmd: %d", rc);
+            nvs_close(handle);
+        }
+    }
+}
+
+void app_state_set_motor_gains(float gain_pos, float gain_neg)
+{
+    lock();
+    s_params.gain_pos = gain_pos;
+    s_params.gain_neg = gain_neg;
+    unlock();
+    {
+        nvs_handle_t handle;
+        esp_err_t rc = nvs_open("storage", NVS_READWRITE, &handle);
+        if (rc == ESP_OK) {
+            rc = nvs_set_blob(handle, "params", &s_params, sizeof(s_params));
+            if (rc == ESP_OK) rc = nvs_commit(handle);
+            if (rc != ESP_OK) ESP_LOGW("app_state", "Failed to save motor gains: %d", rc);
+            nvs_close(handle);
+        }
+    }
+}
+
+void app_state_set_motor_min_cmds(float min_pos, float min_neg)
+{
+    lock();
+    s_params.min_pos = min_pos;
+    s_params.min_neg = min_neg;
+    unlock();
+    {
+        nvs_handle_t handle;
+        esp_err_t rc = nvs_open("storage", NVS_READWRITE, &handle);
+        if (rc == ESP_OK) {
+            rc = nvs_set_blob(handle, "params", &s_params, sizeof(s_params));
+            if (rc == ESP_OK) rc = nvs_commit(handle);
+            if (rc != ESP_OK) ESP_LOGW("app_state", "Failed to save motor min cmds: %d", rc);
+            nvs_close(handle);
+        }
+    }
+}
+
+void app_state_set_motor_kicks(float kick_pos, float kick_neg)
+{
+    lock();
+    s_params.kick_pos = kick_pos;
+    s_params.kick_neg = kick_neg;
+    unlock();
+    {
+        nvs_handle_t handle;
+        esp_err_t rc = nvs_open("storage", NVS_READWRITE, &handle);
+        if (rc == ESP_OK) {
+            rc = nvs_set_blob(handle, "params", &s_params, sizeof(s_params));
+            if (rc == ESP_OK) rc = nvs_commit(handle);
+            if (rc != ESP_OK) ESP_LOGW("app_state", "Failed to save motor kicks: %d", rc);
             nvs_close(handle);
         }
     }
@@ -390,8 +469,11 @@ void app_state_reset_params()
         if (rc != ESP_OK) {
             ESP_LOGW("app_state", "Failed to save default params: %d", rc);
         } else {
-            ESP_LOGI("app_state", "Reset params to defaults kp=%.6f ki=%.6f kd=%.6f limit=%.3f min_cmd=%.3f baseline=%.3f target=%.2f",
-                     params.kp, params.ki, params.kd, params.output_limit, params.min_cmd, params.baseline_cmd, params.target_angle_deg);
+            ESP_LOGI("app_state",
+                     "Reset params to defaults kp=%.6f ki=%.6f kd=%.6f limit=%.3f gain_pos=%.3f gain_neg=%.3f min_pos=%.3f min_neg=%.3f kick_pos=%.3f kick_neg=%.3f baseline=%.3f target=%.2f",
+                     params.kp, params.ki, params.kd, params.output_limit,
+                     params.gain_pos, params.gain_neg, params.min_pos, params.min_neg,
+                     params.kick_pos, params.kick_neg, params.baseline_cmd, params.target_angle_deg);
         }
         nvs_close(handle);
     } else {

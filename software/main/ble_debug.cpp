@@ -109,7 +109,7 @@ int gatt_access_cb(uint16_t conn_handle, uint16_t attr_handle, ble_gatt_access_c
 
     ESP_LOGI(TAG, "ble recv: %s", san);
 
-    char response[160] {};
+    char response[256] {};
     if (s_command_callback != nullptr) {
         s_command_callback(san, response, sizeof(response));
     }

@@ -27,7 +27,12 @@ struct ControlParams {
     float ki = 0.0f;
     float kd = 0.004f;
     float output_limit = 1.0f;
-    float min_cmd = 0.12f; // minimum absolute motor command to overcome deadzone
+    float gain_pos = 1.0f; // motor compensation for positive cmd
+    float gain_neg = 1.35f; // motor compensation for negative cmd
+    float min_pos = 0.18f; // minimum positive command to overcome deadzone
+    float min_neg = 0.24f; // minimum negative command to overcome deadzone
+    float kick_pos = 0.24f; // short positive startup/reversal kick
+    float kick_neg = 0.34f; // short negative startup/reversal kick
     float baseline_cmd = 0.0f; // baseline motor command added to controller output
 };
 
@@ -67,6 +72,10 @@ void app_state_set_ki(float ki);
 void app_state_set_kd(float kd);
 bool app_state_set_output_limit(float limit);
 void app_state_set_min_cmd(float min_cmd);
+void app_state_set_kick_cmd(float kick_cmd);
+void app_state_set_motor_gains(float gain_pos, float gain_neg);
+void app_state_set_motor_min_cmds(float min_pos, float min_neg);
+void app_state_set_motor_kicks(float kick_pos, float kick_neg);
 void app_state_set_baseline_cmd(float baseline);
 void app_state_reset_params();
 

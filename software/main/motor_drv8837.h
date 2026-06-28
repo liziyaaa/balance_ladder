@@ -15,7 +15,7 @@ struct MotorDebug {
 };
 
 esp_err_t motor_init();
-void motor_set(float cmd);
+float motor_set(float cmd);
 void motor_coast();
 void motor_brake();
 void motor_sleep(bool sleep);

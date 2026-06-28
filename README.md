@@ -61,7 +61,7 @@
 | BLE 目标角范围 | `250.0..290.0 deg` |
 | 控制轴 | MPU6050 `Y` 轴，前后倾倒方向 |
 | 加速度角度平面 | `atan2(accel_x, accel_z)` |
-| 控制周期 | 200 Hz |
+| 控制周期 | 250 Hz |
 | BLE 遥测 | 当前 Notify 限速约 10 Hz |
 | 电池检测 | 硬件保留 `BAT_ADC`，当前固件未启用低电压检测 |
 
@@ -165,7 +165,12 @@ kp=0.02
 ki=0
 kd=0.004
 limit=1
-min_cmd=0.12
+gain_pos=1.00
+gain_neg=1.35
+min_pos=0.18
+min_neg=0.24
+kick_pos=0.24
+kick_neg=0.34
 motor=0.3
 ```
 

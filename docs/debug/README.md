@@ -14,7 +14,7 @@ https://liziyaaa.github.io/balance_ladder/
 - 显示状态、角度、目标角、误差、角速度、电机输出、按键和故障状态。当前固件 BLE Notify 限速约 10 Hz。
 - 使用正方体显示当前姿态，并在 3D 场景中标出 X/Y/Z 坐标轴。
 - 提供误差和电机输出曲线，方便观察调参过程中的响应趋势。
-- 支持快捷命令、PID 参数、目标角、最小输出、基准输出和手动电机测试命令。
+- 支持快捷命令、PID 参数、目标角、正反向风力补偿、基准输出和手动电机测试命令。
 - 预留 WiFi WebSocket 和 HTTP 命令入口，方便后续扩展 ESP32 本地网页或 AP 调试。
 
 ## BLE 协议
@@ -69,7 +69,12 @@ kp=0.02
 ki=0
 kd=0.004
 limit=1
-min_cmd=0.12
+gain_pos=1.00
+gain_neg=1.35
+min_pos=0.18
+min_neg=0.24
+kick_pos=0.24
+kick_neg=0.34
 baseline=0
 motor=0.3
 ```
